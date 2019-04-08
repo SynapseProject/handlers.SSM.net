@@ -33,11 +33,11 @@ public class AwsSsmHandler : HandlerRuntimeBase
         try
         {
             _ProgressMessage = "Parsing incoming request...";
-            _result.Status = StatusType.Initializing;
+            _result.Status = StatusType.Running;
             ++sequenceNumber;
             OnProgress(context, _ProgressMessage, _result.Status, sequenceNumber);
             OnLogMessage(context, _ProgressMessage);
-            request = DeserializeOrNew<UserRequest>(startInfo.Parameters);
+            request = DeserializeOrDefault<UserRequest>(startInfo.Parameters);
 
             _ProgressMessage = "Executing request" + (startInfo.IsDryRun ? " in dry run mode..." : "...");
             _result.Status = StatusType.Running;
@@ -141,7 +141,7 @@ public class AwsSsmHandler : HandlerRuntimeBase
         }
         else if (!IsValidCommandType(request.CommandType))
         {
-            errorMessage = "Command type cannot be null or empty.";
+            errorMessage = "Command type cannot be null or empty. Support types: send-command, get-command-invocation.";
         }
         else if (request.CommandType.ToLowerInvariant() == "get-command-invocation" && string.IsNullOrWhiteSpace(request.CommandId))
         {
@@ -150,6 +150,10 @@ public class AwsSsmHandler : HandlerRuntimeBase
         else if (request.CommandType.ToLowerInvariant() == "send-command" && string.IsNullOrWhiteSpace(request.CommandDocument))
         {
             errorMessage = "Command document cannot be null or empty for 'send-command'.";
+        }
+        else if (request.CommandType.ToLowerInvariant() == "send-command" && string.IsNullOrWhiteSpace(request.CommandComment))
+        {
+            errorMessage = "Command comment cannot be null or empty for 'send-command'.";
         }
         else if (!IsAwsRegion(request.AwsRegion))
         {
@@ -270,7 +274,7 @@ public class AwsSsmHandler : HandlerRuntimeBase
             }
             else
             {
-                throw new Exception("AWS credentials cannot be found for the operation.");
+                throw new Exception("AWS credentials cannot be found for the execution.");
             }
         }
         catch (AmazonSimpleSystemsManagementException ex)
@@ -322,7 +326,10 @@ public class AwsSsmHandler : HandlerRuntimeBase
                     break;
                 case "InvocationDoesNotExist":
                     errorMessage =
-                        "The command ID and instance ID you specified did not match any invocations. Verify the command ID adn the instance ID and try again.";
+                        "The command id and instance id specified does not match any invocation.";
+                    break;
+                case "ValidationException":
+                    errorMessage = ex.Message;
                     break;
                 default:
                     errorMessage = ex.Message;
@@ -351,12 +358,13 @@ public class HandlerConfig
 
     public string CommandMaxErrors { get; set; } = "0";
 
-    public int CommandTimeoutSeconds { get; set; } = 3600;
+    // If this time is reached and the command has not already started running, it will not run.
+    public int CommandTimeoutSeconds { get; set; } = 30;
 }
 
 public class SsmCommandResponse
 {
-    public string Status { get; set; }
+    public string Status { get; set; } // "Complete", "Failed"
 
     public string CommandId { get; set; }
 
@@ -370,7 +378,7 @@ public class SsmCommandResponse
 
     public string StandardError { get; set; }
 
-    public string Summary { get; set; }
+    public string Summary { get; set; } // Handler Execution Summary
 }
 
 public class UserRequest
