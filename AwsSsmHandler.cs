@@ -40,7 +40,6 @@ public class AwsSsmHandler : HandlerRuntimeBase
             request = DeserializeOrDefault<UserRequest>(startInfo.Parameters);
 
             _ProgressMessage = "Executing request" + (startInfo.IsDryRun ? " in dry run mode..." : "...");
-            _result.Status = StatusType.Running;
             ++sequenceNumber;
             OnProgress(context, _ProgressMessage, _result.Status, sequenceNumber);
             OnLogMessage(context, _ProgressMessage);
@@ -205,8 +204,6 @@ public class AwsSsmHandler : HandlerRuntimeBase
     public async Task<SsmCommandResponse> ExecuteSsmCommand(UserRequest request, HandlerConfig config)
     {
         if (request == null || config == null) return null;
-
-        bool isSuccess = false;
         string errorMessage = string.Empty;
         SsmCommandResponse output = null;
 
@@ -237,9 +234,6 @@ public class AwsSsmHandler : HandlerRuntimeBase
                     commandRequest.Comment = request.CommandComment;
                     commandRequest.Parameters = request.CommandParameters;
                     SendCommandResponse sendCommandResponse = await ssmClient.SendCommandAsync(commandRequest);
-
-                    isSuccess = true;
-
                     output = new SsmCommandResponse
                     {
                         Status = "Complete",
