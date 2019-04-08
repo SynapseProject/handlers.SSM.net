@@ -68,14 +68,13 @@ public class AwsSsmHandler : HandlerRuntimeBase
             _ProgressMessage = $"Execution has been aborted due to: {errorMessage}";
             response = new SsmCommandResponse()
             {
-                Success = false,
-                Summary = _ProgressMessage,
-                OriginalRequest = request
+                Status = "Failed",
+                Summary = _ProgressMessage
             };
             OnLogMessage(context, _ProgressMessage, LogLevel.Error);
         }
 
-        _result.ExitData = JsonConvert.SerializeObject(response);
+        _result.ExitData = response;
         _result.Sequence = int.MaxValue;
         OnProgress(context, _ProgressMessage, _result.Status, int.MaxValue);
 
@@ -239,12 +238,11 @@ public class AwsSsmHandler : HandlerRuntimeBase
 
                     output = new SsmCommandResponse
                     {
-                        Success = isSuccess,
+                        Status = "Complete",
                         CommandId = sendCommandResponse.Command.CommandId,
                         CommandStatus = sendCommandResponse.Command.StatusDetails,
                         ErrorMessage = errorMessage,
-                        CommandComment = sendCommandResponse.Command.Comment,
-                        OriginalRequest = request
+                        CommandComment = sendCommandResponse.Command.Comment
                     };
                 }
                 else if (request.CommandType == "get-command-invocation")
@@ -260,14 +258,13 @@ public class AwsSsmHandler : HandlerRuntimeBase
 
                     output = new SsmCommandResponse
                     {
-                        Success = isSuccess,
+                        Status = "Complete",
                         CommandId = getCommandResponse.CommandId,
                         CommandStatus = getCommandResponse.StatusDetails,
                         ErrorMessage = errorMessage,
                         StandardOutput = getCommandResponse.StandardOutputContent,
                         StandardError = getCommandResponse.StandardErrorContent,
-                        CommandComment = getCommandResponse.Comment,
-                        OriginalRequest = request
+                        CommandComment = getCommandResponse.Comment
                     };
                 }
             }
@@ -359,7 +356,7 @@ public class HandlerConfig
 
 public class SsmCommandResponse
 {
-    public bool Success { get; set; }
+    public string Status { get; set; }
 
     public string CommandId { get; set; }
 
@@ -374,8 +371,6 @@ public class SsmCommandResponse
     public string StandardError { get; set; }
 
     public string Summary { get; set; }
-
-    public UserRequest OriginalRequest { get; set; }
 }
 
 public class UserRequest
