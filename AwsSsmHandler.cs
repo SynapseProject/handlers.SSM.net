@@ -11,6 +11,7 @@ using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
 using Amazon.Runtime;
 using Amazon.Runtime.CredentialManagement;
+using Amazon.Runtime.Internal;
 
 public class AwsSsmHandler : HandlerRuntimeBase
 {
@@ -217,7 +218,10 @@ public class AwsSsmHandler : HandlerRuntimeBase
 
         try
         {
-            var chain = new CredentialProfileStoreChain();
+            // https://docs.aws.amazon.com/sdk-for-net/v3/developer-guide/net-dg-config-creds.html
+            // Accessing Credentials and Profiles in an Application
+            CredentialProfileStoreChain chain = new CredentialProfileStoreChain(config.AwsProfilesLocation);
+
             AWSCredentials awsCredentials;
             if (chain.TryGetAWSCredentials(request.AwsRole, out awsCredentials))
             {
@@ -332,7 +336,10 @@ public class AwsSsmHandler : HandlerRuntimeBase
 
             throw new Exception(errorMessage);
         }
-
+        catch (Exception ex)
+        {
+            throw new Exception(ex.Message);
+        }
         return output;
     }
 
@@ -340,6 +347,8 @@ public class AwsSsmHandler : HandlerRuntimeBase
 
 public class HandlerConfig
 {
+    public string AwsProfilesLocation { get; set; }
+
     // https://docs.aws.amazon.com/sdk-for-net/v3/developer-guide/retries-timeouts.html
     public int ClientMaxErrorRetry { get; set; } = 4;
 
