@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.489
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "handlers.SSM.net", "handlers.SSM.net.csproj", "{D68FF9D9-3EC9-42A5-8013-7687957F1621}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Synapse.Handlers.SSM", "Synapse.Handlers.SSM.csproj", "{D68FF9D9-3EC9-42A5-8013-7687957F1621}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "handlers.SSM.net.Tests", "handlers.SSM.net.Tests\handlers.SSM.net.Tests.csproj", "{1B1B222C-B615-46B4-B28F-2CCB09B2D5AB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Synapse.Handlers.SSM.Tests", "Synapse.Handlers.SSM.Tests\Synapse.Handlers.SSM.Tests.csproj", "{1B1B222C-B615-46B4-B28F-2CCB09B2D5AB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

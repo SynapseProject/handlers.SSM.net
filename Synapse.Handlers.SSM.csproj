@@ -7,11 +7,12 @@
     <ProjectGuid>{D68FF9D9-3EC9-42A5-8013-7687957F1621}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>handlers.SSM.net</RootNamespace>
-    <AssemblyName>handlers.SSM.net</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <RootNamespace>Synapse.Handlers.SSM</RootNamespace>
+    <AssemblyName>Synapse.Handlers.SSM</AssemblyName>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
