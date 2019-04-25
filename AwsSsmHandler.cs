@@ -252,7 +252,8 @@ public class AwsSsmHandler : HandlerRuntimeBase
                     GetCommandInvocationRequest commandRequest = new GetCommandInvocationRequest()
                     {
                         CommandId = request.CommandId,
-                        InstanceId = request.InstanceId
+                        InstanceId = request.InstanceId,
+                        PluginName = request.CommandPluginName // If there are more than one plugins, this cannot be null.
                     };
 
                     GetCommandInvocationResponse getCommandResponse =
@@ -397,6 +398,8 @@ public class UserRequest
     public Dictionary<string, List<string>> CommandParameters { get; set; }
 
     public string CommandComment { get; set; }
+
+    public string CommandPluginName { get; set; }
 
     public string AwsRegion { get; set; }
 
