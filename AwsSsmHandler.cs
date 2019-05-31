@@ -16,68 +16,59 @@ using Amazon.Runtime.Internal;
 public class AwsSsmHandler : HandlerRuntimeBase
 {
     private HandlerConfig _config;
-    private string _ProgressMessage = "";
+    private string _progressMessage = "";
+    private int _sequenceNumber = 0;
+    private string _context = "Execute";
+    private SsmCommandResponse _response = null;
+    private UserRequest _request = null;
+    private ExecuteResult _result = new ExecuteResult()
+    {
+        Status = StatusType.None,
+        BranchStatus = StatusType.None,
+        Sequence = int.MaxValue
+    };
 
     public override ExecuteResult Execute(HandlerStartInfo startInfo)
     {
-        int sequenceNumber = 0;
-        string context = "Execute";
-        SsmCommandResponse response = null;
-        UserRequest request = null;
-        ExecuteResult _result = new ExecuteResult()
-        {
-            Status = StatusType.None,
-            BranchStatus = StatusType.None,
-            Sequence = int.MaxValue
-        };
-
         try
         {
-            _ProgressMessage = "Parsing incoming request...";
-            _result.Status = StatusType.Running;
-            ++sequenceNumber;
-            OnProgress(context, _ProgressMessage, _result.Status, sequenceNumber);
-            OnLogMessage(context, _ProgressMessage);
-            request = DeserializeOrDefault<UserRequest>(startInfo.Parameters);
+            UpdateProgress("Parsing incoming request...", StatusType.Running);
+            _request = DeserializeOrDefault<UserRequest>(startInfo.Parameters);
 
-            _ProgressMessage = "Executing request" + (startInfo.IsDryRun ? " in dry run mode..." : "...");
-            ++sequenceNumber;
-            OnProgress(context, _ProgressMessage, _result.Status, sequenceNumber);
-            OnLogMessage(context, _ProgressMessage);
-
-            if (ValidateRequest(request))
+            UpdateProgress("Executing request" + (startInfo.IsDryRun ? " in dry run mode..." : "..."), StatusType.Running);
+            if (ValidateRequest(_request))
             {
                 if (!startInfo.IsDryRun)
                 {
-                    response = ExecuteSsmCommand(request, _config).Result;
-                    _ProgressMessage = "Execution is completed.";
-                    response.Summary = _ProgressMessage;
+                    _response = RunSsmCommand(_request, _config).Result;
+                    UpdateProgress("Execution is completed.", StatusType.Complete, int.MaxValue);
+                    if (_response == null)
+                    {
+                        _response = new SsmCommandResponse
+                        {
+                            Status = "Failed"
+                        };
+                    }
+                    _response.Summary = _progressMessage;
                 }
                 else
                 {
-                    _ProgressMessage = "Dry run execution is completed.";
+                    UpdateProgress("Dry run execution is completed.", StatusType.Complete, int.MaxValue);
                 }
-                _result.Status = StatusType.Complete;
-                OnLogMessage(context, _ProgressMessage);
             }
         }
         catch (Exception ex)
         {
             string errorMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-            _result.Status = StatusType.Failed;
-            _ProgressMessage = $"Execution has been aborted due to: {errorMessage}";
-            response = new SsmCommandResponse()
+            UpdateProgress($"Execution has been aborted due to: {errorMessage}", StatusType.Failed, int.MaxValue, LogLevel.Error, ex);
+            _response = new SsmCommandResponse()
             {
                 Status = "Failed",
-                Summary = _ProgressMessage
+                Summary = _progressMessage
             };
-            OnLogMessage(context, _ProgressMessage, LogLevel.Error);
         }
 
-        _result.ExitData = response;
-        _result.Sequence = int.MaxValue;
-        OnProgress(context, _ProgressMessage, _result.Status, int.MaxValue);
-
+        _result.ExitData = _response;
         return _result;
     }
 
@@ -202,11 +193,14 @@ public class AwsSsmHandler : HandlerRuntimeBase
         return RegionEndpoint.GetBySystemName(region).DisplayName != "Unknown";
     }
 
-    public async Task<SsmCommandResponse> ExecuteSsmCommand(UserRequest request, HandlerConfig config)
+    public async Task<SsmCommandResponse> RunSsmCommand(UserRequest request, HandlerConfig config)
     {
         if (request == null || config == null) return null;
         string errorMessage = string.Empty;
-        SsmCommandResponse output = null;
+        SsmCommandResponse output = new SsmCommandResponse()
+        {
+            Status = "Failed" // If no processing is done.
+        };
 
         AmazonSimpleSystemsManagementConfig clientConfig = new AmazonSimpleSystemsManagementConfig()
         {
@@ -225,12 +219,12 @@ public class AwsSsmHandler : HandlerRuntimeBase
             AWSCredentials awsCredentials;
             if (chain.TryGetAWSCredentials(request.AwsRole, out awsCredentials))
             {
-                // use awsCredentials
+                // Use awsCredentials
                 AmazonSimpleSystemsManagementClient ssmClient =
                     new AmazonSimpleSystemsManagementClient(awsCredentials, clientConfig);
                 if (request.CommandType == "send-command")
                 {
-                    List<string> instanceIds = new List<string> {request.InstanceId};
+                    List<string> instanceIds = new List<string> { request.InstanceId };
                     SendCommandRequest commandRequest = new SendCommandRequest(request.CommandDocument, instanceIds);
                     commandRequest.MaxConcurrency = config.CommandMaxConcurrency; // 50%
                     commandRequest.MaxErrors = config.CommandMaxErrors;
@@ -238,42 +232,52 @@ public class AwsSsmHandler : HandlerRuntimeBase
                     commandRequest.Comment = request.CommandComment;
                     commandRequest.Parameters = request.CommandParameters;
                     SendCommandResponse sendCommandResponse = await ssmClient.SendCommandAsync(commandRequest);
-                    output = new SsmCommandResponse
-                    {
-                        Status = "Complete",
-                        CommandId = sendCommandResponse.Command.CommandId,
-                        CommandStatus = sendCommandResponse.Command.StatusDetails,
-                        ErrorMessage = errorMessage,
-                        CommandComment = sendCommandResponse.Command.Comment
-                    };
+
+                    output.Status = "Complete";
+                    output.CommandId = sendCommandResponse.Command.CommandId;
+                    output.CommandStatus = sendCommandResponse.Command.StatusDetails;
+                    output.ErrorMessage = errorMessage;
+                    output.CommandComment = sendCommandResponse.Command.Comment;
                 }
                 else if (request.CommandType == "get-command-invocation")
                 {
-                    GetCommandInvocationRequest commandRequest = new GetCommandInvocationRequest()
+                    //GetCommandInvocationRequest commandRequest = new GetCommandInvocationRequest()
+                    //{
+                    //    CommandId = request.CommandId,
+                    //    InstanceId = request.InstanceId,
+                    //    PluginName = request.CommandPluginName // If there are more than one plugins, this cannot be null.
+                    //};
+                    //GetCommandInvocationResponse getCommandResponse =
+                    //    await ssmClient.GetCommandInvocationAsync(commandRequest);
+
+                    ListCommandInvocationsRequest commandRequest = new ListCommandInvocationsRequest()
                     {
                         CommandId = request.CommandId,
-                        InstanceId = request.InstanceId,
-                        PluginName = request.CommandPluginName // If there are more than one plugins, this cannot be null.
+                        Details = true
                     };
+                    ListCommandInvocationsResponse commandResponse = await ssmClient.ListCommandInvocationsAsync(commandRequest);
 
-                    GetCommandInvocationResponse getCommandResponse =
-                        await ssmClient.GetCommandInvocationAsync(commandRequest);
-
-                    output = new SsmCommandResponse
+                    if (commandResponse.CommandInvocations.Count > 0)
                     {
-                        Status = "Complete",
-                        CommandId = getCommandResponse.CommandId,
-                        CommandStatus = getCommandResponse.StatusDetails,
-                        ErrorMessage = errorMessage,
-                        StandardOutput = getCommandResponse.StandardOutputContent,
-                        StandardError = getCommandResponse.StandardErrorContent,
-                        CommandComment = getCommandResponse.Comment
-                    };
+                        output.Status = "Complete";
+                        output.CommandId = commandResponse.CommandInvocations[0].CommandId;
+                        output.CommandStatus = commandResponse.CommandInvocations[0].StatusDetails;
+                        output.CommandComment = commandResponse.CommandInvocations[0].Comment;
+                        if (commandResponse.CommandInvocations[0].StatusDetails == "Success" &&
+                            commandResponse.CommandInvocations[0].CommandPlugins.Count > 0)
+                        {
+                            output.StandardOutput = commandResponse.CommandInvocations[0].CommandPlugins[0].Output;
+                        }
+                    }
+                    else
+                    {
+                        errorMessage = "The command id and instance id specified did not match any invocation.";
+                    }
                 }
             }
             else
             {
-                throw new Exception("AWS credentials cannot be found for the execution.");
+                errorMessage = "AWS credentials cannot be found for the execution.";
             }
         }
         catch (AmazonSimpleSystemsManagementException ex)
@@ -325,7 +329,7 @@ public class AwsSsmHandler : HandlerRuntimeBase
                     break;
                 case "InvocationDoesNotExist":
                     errorMessage =
-                        "The command id and instance id specified does not match any invocation.";
+                        "The command id and instance id specified did not match any invocation.";
                     break;
                 case "ValidationException":
                     errorMessage = ex.Message;
@@ -334,16 +338,29 @@ public class AwsSsmHandler : HandlerRuntimeBase
                     errorMessage = ex.Message;
                     break;
             }
-
-            throw new Exception(errorMessage);
         }
         catch (Exception ex)
         {
-            throw new Exception(ex.Message);
+            errorMessage = ex.Message;
+        }
+
+        if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+
+            throw new Exception(errorMessage);
+
         }
         return output;
     }
 
+    private void UpdateProgress(string message, StatusType status, int sequenceNumber = 0, LogLevel logLevel = LogLevel.Info, Exception ex = null)
+    {
+        _progressMessage = $"{DateTime.UtcNow} {message}";
+        _result.Status = status;
+        _sequenceNumber = sequenceNumber == 0 ? _sequenceNumber++ : sequenceNumber;
+        OnProgress(_context, _progressMessage, _result.Status, _sequenceNumber);
+        OnLogMessage(_context, _progressMessage, logLevel, ex);
+    }
 }
 
 public class HandlerConfig
