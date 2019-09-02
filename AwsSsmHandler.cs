@@ -302,7 +302,7 @@ public class AwsSsmHandler : HandlerRuntimeBase
                     errorMessage = "The security token included in the request is expired.";
                     break;
                 case "InvalidInstanceId":
-                    errorMessage = "The instance is invalid.";
+                    errorMessage = "Possible causes are the 1) server instance may not be running 2) Server instance may not exist. 3) SSM agent may not be running. 4) Account used does not have permssion to access the instance.";
                     break;
                 case "InvalidNotificationConfig":
                     errorMessage = "One or more configuration items is not valid.";
