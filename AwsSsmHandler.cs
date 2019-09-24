@@ -268,6 +268,19 @@ public class AwsSsmHandler : HandlerRuntimeBase
                         {
                             output.StandardOutput = commandResponse.CommandInvocations[0].CommandPlugins[0].Output;
                         }
+                        else if (commandResponse.CommandInvocations[0].StatusDetails == "Failed" &&
+                            commandResponse.CommandInvocations[0].CommandPlugins.Count > 0)
+                        {
+                            GetCommandInvocationRequest invocationRequest = new GetCommandInvocationRequest()
+                            {
+                                CommandId = request.CommandId,
+                                InstanceId = request.InstanceId,
+                                PluginName = request.CommandPluginName // If there are more than one plugins, this cannot be null.
+                            };
+                            GetCommandInvocationResponse getCommandResponse =
+                                await ssmClient.GetCommandInvocationAsync(invocationRequest);
+                            output.StandardError = getCommandResponse.StandardErrorContent;
+                        }
                     }
                     else
                     {
