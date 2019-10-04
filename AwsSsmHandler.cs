@@ -279,6 +279,7 @@ public class AwsSsmHandler : HandlerRuntimeBase
                             };
                             GetCommandInvocationResponse getCommandResponse =
                                 await ssmClient.GetCommandInvocationAsync(invocationRequest);
+                            output.StandardOutput = getCommandResponse.StandardOutputContent;
                             output.StandardError = getCommandResponse.StandardErrorContent;
                         }
                     }
